@@ -5,8 +5,11 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Semantic Bookmarks</h1>
-  <input type="text" id="search" placeholder="Search...">
+  <div class="header-container">
+    <h1>Semantic Bookmarks</h1>
+    <button id="clearButton" title="Clear Search">X</button>
+  </div>
+  <input type="text" id="search" placeholder="">
   <button id="searchButton">Search</button>
   <div id="results"></div>
   <script src="popup.js"></script>

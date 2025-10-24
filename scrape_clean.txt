@@ -1,0 +1,12 @@
+# This file contains a list of "anti-patterns" for web scraping.
+# If the scraped text from a website contains any of these exact phrases,
+# the extension will consider the scrape to have failed and will fall back
+# to using the bookmark's title for the embedding.
+#
+# Add new patterns below, with each pattern on a new line.
+# The check is case-insensitive.
+
+error while loading. Please reload this page.
+We don’t support that file type.
+Loading
+There was an error creating your Gist.

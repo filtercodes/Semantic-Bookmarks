@@ -89,3 +89,30 @@ a:hover {
   font-size: 16px; /* Set explicit larger size for results */
   margin-bottom: 0;
 }
+
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+h1 {
+  margin-bottom: 0; /* Adjust for new layout */
+}
+
+#clearButton {
+  background: none;
+  border: none;
+  color: #bdc1c6;
+  font-size: 1.5em;
+  cursor: pointer;
+  padding: 0 5px;
+  line-height: 1;
+  margin-top: 0; /* Override default button margin */
+}
+
+#clearButton:hover {
+  color: #e8eaed;
+  background: none; /* Override default hover */
+}
