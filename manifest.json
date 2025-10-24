@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Semantic Bookmarks",
+  "version": "0.1.0",
+  "description": "Search your bookmarks semantically.",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "http://localhost:11434/",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

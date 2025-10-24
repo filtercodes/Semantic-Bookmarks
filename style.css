@@ -1,0 +1,91 @@
+body {
+  background-color: #202124;
+  color: #e8eaed;
+  font-family: sans-serif;
+  min-width: 300px;
+  padding: 15px;
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 1.2em;
+  margin-top: 0;
+  color: #727478;
+  /* color: #bdc1c6; */
+}
+
+input[type="text"] {
+  width: 95%;
+  padding: 8px;
+  border-radius: 15px;
+  border: 1px solid #5f6368;
+  background-color: #303134;
+  color: #e8eaed;
+  /* Removed explicit font-size to revert to smaller default */
+}
+
+input[type="checkbox"] {
+  accent-color: #5f6368;
+  width: 15px;
+  height: 15px;
+  vertical-align: middle;
+}
+
+/* Target folder labels for better readability */
+#folders label {
+  font-size: 16px;
+}
+
+button {
+  background-color: #303134;
+  /* color: #e8eaed; */
+  color: #727478;
+  border: 1px solid #5f6368;
+  padding: 8px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+  font-size: 1.1em;
+  transition: background-color 0.2s ease-in-out;
+}
+
+button:hover {
+  background-color: #3c4043;
+}
+
+a {
+  color: #8ab4f8;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+#results div {
+  border: 1px solid #5f6368;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+}
+
+#results {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+#searchButton {
+  margin-top: 15px;
+  margin-left: 5px;
+}
+
+#results h3 {
+  margin-top: 0;
+  font-size: 1em;
+}
+
+#results p {
+  font-size: 16px; /* Set explicit larger size for results */
+  margin-bottom: 0;
+}
