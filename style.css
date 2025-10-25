@@ -15,13 +15,12 @@ h1 {
 }
 
 input[type="text"] {
-  width: 95%;
+  width: 85%;
   padding: 8px;
   border-radius: 15px;
   border: 1px solid #5f6368;
   background-color: #303134;
   color: #e8eaed;
-  /* Removed explicit font-size to revert to smaller default */
 }
 
 input[type="checkbox"] {
@@ -33,7 +32,8 @@ input[type="checkbox"] {
 
 /* Target folder labels for better readability */
 #folders label {
-  font-size: 16px;
+  font-size: 18px;
+  padding: 15px;
 }
 
 button {
@@ -105,7 +105,7 @@ h1 {
   background: none;
   border: none;
   color: #bdc1c6;
-  font-size: 1.5em;
+  font-size: 0.9em;
   cursor: pointer;
   padding: 0 5px;
   line-height: 1;
@@ -115,4 +115,16 @@ h1 {
 #clearButton:hover {
   color: #e8eaed;
   background: none; /* Override default hover */
+}
+
+#search {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%235f6368" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  padding-left: 35px;
+}
+
+#clearButton.inactive {
+  color: #313236;
+  pointer-events: none; /* Makes the button unclickable */
 }

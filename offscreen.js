@@ -1,4 +1,5 @@
 // offscreen.js
+const SCRAPE_TIMEOUT_MS = 20000; // 20 seconds
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'scrape') {
@@ -8,8 +9,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function scrape(url) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT_MS);
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId); // Clear the timeout if the fetch succeeds
+
     if (!response.ok) {
       return { error: `Failed to fetch ${url}: ${response.statusText}` };
     }
@@ -32,6 +38,10 @@ async function scrape(url) {
 
     return { text };
   } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      return { error: `Failed to scrape ${url}: Request timed out after ${SCRAPE_TIMEOUT_MS / 1000} seconds.` };
+    }
     return { error: `Failed to scrape ${url}: ${error.message}` };
   }
 }

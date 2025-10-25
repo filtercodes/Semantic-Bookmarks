@@ -6,7 +6,10 @@
 # Add new patterns below, with each pattern on a new line.
 # The check is case-insensitive.
 
+Something went wrong
 error while loading. Please reload this page.
 We don’t support that file type.
 Loading
 There was an error creating your Gist.
+Redirecting...
+oh! There was an error while loading.

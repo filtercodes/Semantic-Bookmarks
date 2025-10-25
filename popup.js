@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResults(results) {
     resultsDiv.innerHTML = '';
     if (results && results.length > 0) {
+      clearButton.classList.remove('inactive');
       results.forEach((result) => {
         const resultDiv = document.createElement('div');
         resultDiv.style.border = '1px solid #ccc';
@@ -37,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } else {
       resultsDiv.innerHTML = 'No results found.';
+      clearButton.classList.add('inactive');
     }
   }
 
@@ -55,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       resultsDiv.innerHTML = '';
       chrome.storage.session.remove(['lastSearchQuery', 'lastSearchResults', 'lastScrollPosition']);
+      clearButton.classList.add('inactive');
     }
   }
 
@@ -62,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.value = '';
     resultsDiv.innerHTML = '';
     chrome.storage.session.remove(['lastSearchQuery', 'lastSearchResults', 'lastScrollPosition']);
+    clearButton.classList.add('inactive');
   }
 
   // Event Listeners
@@ -91,6 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.lastScrollPosition) {
         resultsDiv.scrollTop = data.lastScrollPosition;
       }
+    } else {
+      // If there's no state, ensure the button is inactive
+      clearButton.classList.add('inactive');
     }
   });
 });
