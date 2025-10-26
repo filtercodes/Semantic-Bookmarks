@@ -1,7 +1,6 @@
 // background.js
 
 const DB_NAME = 'semanticBookmarks';
-const DB_VERSION = 1;
 const BOOKMARKS_STORE = 'bookmarks';
 const EMBEDDINGS_STORE = 'embeddings';
 const INDEXED_FOLDERS_KEY = 'indexedFolders';
@@ -16,7 +15,8 @@ let SCRAPING_ANTI_PATTERNS = [];
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    // Version is hardcoded to 1 to avoid complex upgrade paths.
+    const request = indexedDB.open(DB_NAME, 1);
 
     request.onupgradeneeded = (event) => {
       db = event.target.result;
@@ -24,8 +24,8 @@ function openDB() {
         db.createObjectStore(BOOKMARKS_STORE, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(EMBEDDINGS_STORE)) {
-        const embeddingsStore = db.createObjectStore(EMBEDDINGS_STORE, { autoIncrement: true });
-        embeddingsStore.createIndex('bookmarkId', 'bookmarkId', { unique: false });
+        // The index is no longer created, simplifying the schema.
+        db.createObjectStore(EMBEDDINGS_STORE, { autoIncrement: true });
       }
     };
 
@@ -63,35 +63,49 @@ const initializationComplete = (async () => {
 })();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Wrap the message handling in an async function to wait for initialization
-  (async () => {
-    await initializationComplete;
+  const messageHandlers = {
+    syncBookmarks: (payload) => syncBookmarks(payload),
+    search: async (payload) => sendResponse(await search(payload)),
+    clearData: async () => sendResponse(await clearAllData()),
+    getStats: async () => sendResponse(await getStats()),
+  };
 
-    if (message.type === 'startIndexing') {
-      // No need to wait for this to finish, so don't await
-      startIndexing(message.payload);
-    } else if (message.type === 'search') {
-      const results = await search(message.payload);
-      sendResponse(results);
-    } else if (message.type === 'clearData') {
-      await clearAllData();
-      sendResponse({ success: true });
-    } else if (message.type === 'getStats') {
-      const stats = await getStats();
-      sendResponse(stats);
-    }
-  })();
+  const handler = messageHandlers[message.type];
 
-  return true; // Return true to indicate we will send a response asynchronously
+  if (handler) {
+    (async () => {
+      await initializationComplete;
+      await handler(message.payload);
+    })();
+
+    // Return true only for messages that expect a response.
+    return ['search', 'clearData', 'getStats'].includes(message.type);
+  }
+
+  // It's good practice to return false or undefined for unhandled messages.
+  return false;
 });
 
 
-// --- Core Logic: Indexing ---
+// --- Core Logic: Syncing ---
 
 function isScrapeSuccessful(text) {
   if (!text || text.length < MIN_SCRAPE_LENGTH) {
     return false;
   }
+
+  // Sanity check: Ensure the text is not mostly gibberish/encoded data.
+  // We calculate the percentage of alphanumeric characters.
+  const alphanumeric = text.match(/[a-zA-Z0-9]/g);
+  if (!alphanumeric) {
+    return false; // No alphanumeric characters
+  }
+  const alphanumericRatio = alphanumeric.length / text.length;
+  if (alphanumericRatio < 0.5) { // If less than 50% of chars are alphanumeric
+    console.log(`Scrape failed quality check: low alphanumeric ratio (${alphanumericRatio.toFixed(2)})`);
+    return false;
+  }
+
   const lowercasedText = text.toLowerCase();
   for (const pattern of SCRAPING_ANTI_PATTERNS) {
     if (lowercasedText.includes(pattern)) {
@@ -101,58 +115,77 @@ function isScrapeSuccessful(text) {
   return true;
 }
 
-async function startIndexing(selectedFolders) {
-  sendStatus('Finding bookmarks...');
-  const { indexedFolders = [] } = await chrome.storage.local.get(INDEXED_FOLDERS_KEY);
-  const newFoldersToIndex = selectedFolders.filter(id => !indexedFolders.includes(id));
+async function syncBookmarks(selectedFolderIds) {
+  sendStatus('Starting sync...');
 
-  if (newFoldersToIndex.length === 0) {
-    sendStatus('All selected folders are already indexed.');
-    return;
+  // Get all bookmark IDs currently in the database
+  const existingBookmarkIds = new Set(await getAllKeysFromStore(BOOKMARKS_STORE));
+  console.log(`Found ${existingBookmarkIds.size} existing bookmarks in DB.`);
+
+  // Get all bookmarks from the user-selected folders
+  const bookmarksInSelectedFolders = await getBookmarks(selectedFolderIds);
+  const selectedBookmarkIds = new Set(bookmarksInSelectedFolders.map(b => b.id));
+  console.log(`Found ${selectedBookmarkIds.size} bookmarks in selected folders.`);
+
+  // Determine what to add and what to remove
+  const bookmarksToAdd = bookmarksInSelectedFolders.filter(b => !existingBookmarkIds.has(b.id));
+  const bookmarkIdsToRemove = [...existingBookmarkIds].filter(id => !selectedBookmarkIds.has(id));
+
+  console.log(`New bookmarks to index: ${bookmarksToAdd.length}`);
+  console.log(`Bookmarks to remove: ${bookmarkIdsToRemove.length}`);
+
+  // Remove bookmarks that are no longer in selected folders
+  if (bookmarkIdsToRemove.length > 0) {
+    sendStatus(`Removing ${bookmarkIdsToRemove.length} old bookmarks...`);
+    await removeBookmarks(bookmarkIdsToRemove);
   }
 
-  const bookmarks = await getBookmarks(newFoldersToIndex);
-  console.log('Found new bookmarks to index:', bookmarks);
+  // Index the bookmarks
+  if (bookmarksToAdd.length > 0) {
+    await createOffscreenDocument();
+    let count = 0;
+    for (const bookmark of bookmarksToAdd) {
+      count++;
+      sendStatus(`Indexing ${count} of ${bookmarksToAdd.length}: ${bookmark.title}`);
+      const result = await chrome.runtime.sendMessage({ type: 'scrape', payload: bookmark.url });
 
-  await createOffscreenDocument();
-
-  let count = 0;
-  for (const bookmark of bookmarks) {
-    count++;
-    sendStatus(`Indexing ${count} of ${bookmarks.length}: ${bookmark.title}`);
-    const result = await chrome.runtime.sendMessage({ type: 'scrape', payload: bookmark.url });
-
-    if (result && !result.error && isScrapeSuccessful(result.text)) {
-      // --- Successful Scrape: Prepend title to content ---
-      const textWithTitle = `${bookmark.title}\n\n${result.text}`;
-      const chunks = chunkText(textWithTitle);
-      for (const chunk of chunks) {
-        const embedding = await getEmbedding(chunk);
-        if (embedding) {
-          await storeData(bookmark, chunk, embedding);
+      if (result && !result.error && isScrapeSuccessful(result.text)) {
+        const textWithTitle = `${bookmark.title}\n\n${result.text}`;
+        const chunks = chunkText(textWithTitle);
+        for (const chunk of chunks) {
+          // Log the chunk details for diagnosis before sending to the embedding model.
+          console.log(`Attempting to embed chunk of length: ${chunk.length} characters.`);
+          console.log('Chunk content:', chunk);
+          const embedding = await getEmbedding(chunk);
+          if (embedding) {
+            await storeData(bookmark, chunk, embedding);
+          }
+        }
+      } else {
+        console.log(`Scrape failed for ${bookmark.url}. Falling back to title. Reason:`, result.error || "Failed quality check.");
+        // Chunk the title as it might be too long, but only use the first chunk.
+        const titleChunk = chunkText(bookmark.title)[0];
+        if (titleChunk) {
+          const embedding = await getEmbedding(titleChunk);
+          if (embedding) {
+            // Store with a placeholder to indicate the content was not scraped.
+            await storeData(bookmark, "[Content could not be scraped...]", embedding);
+          }
         }
       }
-    } else {
-      // --- Failed Scrape: Fallback to Title Only ---
-      console.log(`Scrape failed for ${bookmark.url}. Falling back to title. Reason:`, result.error || "Failed quality check.");
-      const embedding = await getEmbedding(bookmark.title);
-      if (embedding) {
-        await storeData(bookmark, "[Content could not be scraped...]", embedding);
-      }
     }
+    await chrome.offscreen.closeDocument();
   }
 
-  await chrome.offscreen.closeDocument();
+  // Update the list of indexed folders in storage
+  await chrome.storage.local.set({ [INDEXED_FOLDERS_KEY]: selectedFolderIds });
 
-  const updatedIndexedFolders = [...indexedFolders, ...newFoldersToIndex];
-  await chrome.storage.local.set({ [INDEXED_FOLDERS_KEY]: updatedIndexedFolders });
-
-  console.log('Indexing complete.');
-  sendStatus('Indexing complete.');
+  console.log('Sync complete.');
+  sendStatus('Sync complete.');
 }
 
 
-// --- Core Logic: Searching ---
+// --- Searching ---
 
 async function search(query) {
   console.log('Searching for:', query);
@@ -222,13 +255,37 @@ async function getEmbedding(text) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'mxbai-embed-large:latest', prompt: text }),
     });
+
     if (!response.ok) {
-      throw new Error(`Failed to get embedding: ${response.statusText}`);
+      const errorText = await response.text();
+      // Check for the specific context length error to retry
+      if (errorText.includes('the input length exceeds the context length')) {
+        console.warn('Embedding failed due to length, retrying with truncated text.');
+        const truncatedText = text.substring(0, 800);
+        const retryResponse = await fetch('http://localhost:11434/api/embeddings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'mxbai-embed-large:latest', prompt: truncatedText }),
+        });
+
+        if (!retryResponse.ok) {
+          const retryErrorText = await retryResponse.text();
+          console.error(`Failed to get embedding on retry. Status: ${retryResponse.status}, Response: ${retryErrorText}`);
+          throw new Error(`Failed to get embedding on retry: ${retryResponse.statusText}`);
+        }
+        const data = await retryResponse.json();
+        return data.embedding;
+      } else {
+        // Handle other non-ok responses
+        console.error(`Failed to get embedding. Status: ${response.status}, Response: ${errorText}`);
+        throw new Error(`Failed to get embedding: ${response.statusText}`);
+      }
     }
+
     const data = await response.json();
     return data.embedding;
   } catch (error) {
-    console.error('Failed to get embedding:', error);
+    console.error('Exception in getEmbedding:', error);
     return null;
   }
 }
@@ -245,11 +302,25 @@ function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-function chunkText(text, chunkSize = 200) {
-  const words = text.split(/\s+/);
+function chunkText(text, maxLength = 1400) {
   const chunks = [];
-  for (let i = 0; i < words.length; i += chunkSize) {
-    chunks.push(words.slice(i, i + chunkSize).join(' '));
+  while (text.length > 0) {
+    if (text.length <= maxLength) {
+      chunks.push(text);
+      break;
+    }
+    // Find the last space within the maxLength to avoid breaking words.
+    let splitPos = text.lastIndexOf(' ', maxLength);
+    
+    // If no space is found (e.g., in CJK languages or a long URL),
+    // perform hard cut at maxLength.
+    if (splitPos <= 0) {
+      splitPos = maxLength;
+    }
+    
+    // Push the chunk and update the remaining text.
+    chunks.push(text.substring(0, splitPos));
+    text = text.substring(splitPos).trim(); // .trim() to remove leading space
   }
   return chunks;
 }
@@ -262,6 +333,40 @@ async function storeData(bookmark, chunk, embedding) {
   embeddingsStore.put({ bookmarkId: bookmark.id, chunk: chunk, embedding: embedding });
   return tx.complete;
 }
+
+async function removeBookmarks(bookmarkIds) {
+  const idsToDelete = new Set(bookmarkIds);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([BOOKMARKS_STORE, EMBEDDINGS_STORE], 'readwrite');
+    const bookmarksStore = tx.objectStore(BOOKMARKS_STORE);
+    const embeddingsStore = tx.objectStore(EMBEDDINGS_STORE);
+
+    tx.oncomplete = () => {
+      resolve();
+    };
+    tx.onerror = (event) => {
+      reject(event.target.error);
+    };
+
+    // Delete the main bookmark entries from the bookmarks store.
+    for (const id of idsToDelete) {
+      bookmarksStore.delete(id);
+    }
+
+    // Iterate over the embeddings to delete related chunks.
+    const cursorRequest = embeddingsStore.openCursor();
+    cursorRequest.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        if (idsToDelete.has(cursor.value.bookmarkId)) {
+          cursor.delete();
+        }
+        cursor.continue();
+      }
+    };
+  });
+}
+
 
 async function getBookmarks(folderIds) {
   return new Promise((resolve) => {
@@ -356,6 +461,20 @@ function getAllFromStore(storeName) {
       } else {
         resolve(items);
       }
+    };
+    request.onerror = (event) => {
+      reject(event.target.error);
+    };
+  });
+}
+
+function getAllKeysFromStore(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+    const request = store.getAllKeys();
+    request.onsuccess = () => {
+      resolve(request.result);
     };
     request.onerror = (event) => {
       reject(event.target.error);

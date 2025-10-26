@@ -53,6 +53,24 @@ button:hover {
   background-color: #3c4043;
 }
 
+.main-title {
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: #bdc1c6;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+#controls {
+  margin-bottom: 15px;
+}
+
+#controls button {
+  margin-right: 10px;
+}
+
 a {
   color: #8ab4f8;
   text-decoration: none;

@@ -3,6 +3,12 @@
   "name": "Semantic Bookmarks",
   "version": "0.1.0",
   "description": "Search your bookmarks semantically.",
+  "icons": {
+    "16": "Images/Icon16x16.png",
+    "32": "Images/Icon32x32.png",
+    "48": "Images/Icon48x48.png",
+    "128": "Images/Icon128x128.png"
+  },
   "permissions": [
     "bookmarks",
     "storage",

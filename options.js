@@ -3,33 +3,43 @@ const INDEXED_FOLDERS_KEY = 'indexedFolders';
 
 document.addEventListener('DOMContentLoaded', () => {
   const foldersDiv = document.getElementById('folders');
-  const startIndexingButton = document.getElementById('startIndexing');
-  const clearDataButton = document.getElementById('clearData');
+  const syncBookmarksButton = document.getElementById('syncBookmarks');
+  const selectAllButton = document.getElementById('selectAll');
+  const deselectAllButton = document.getElementById('deselectAll');
   const statusDiv = document.getElementById('status');
   const statsDiv = document.getElementById('stats');
 
+  const folderData = {}; // To store folder titles for confirmation messages
+
   function renderFolders() {
-    foldersDiv.innerHTML = ''; // Clear existing folders
-    chrome.bookmarks.getTree(async (tree) => {
-      const { indexedFolders = [] } = await chrome.storage.local.get(INDEXED_FOLDERS_KEY);
-      const folders = getFolders(tree);
+    foldersDiv.innerHTML = ''; // Clear the list to prevent duplicates
+
+    // This is the correct, original pattern for loading data.
+    // The `async` keyword here is essential for `await` to work inside.
+    chrome.bookmarks.getTree(async (bookmarkTree) => {
+      // Await the promise returned by chrome.storage.local.get().
+      // This guarantees we have the data before proceeding.
+      const storageData = await chrome.storage.local.get(INDEXED_FOLDERS_KEY);
+      const indexedFolders = storageData[INDEXED_FOLDERS_KEY] || [];
+
+      // Build the folder list.
+      const folders = getFolders(bookmarkTree);
 
       folders.forEach((folder) => {
+        folderData[folder.id] = folder.title; // Store title for later use
+
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.id = folder.id;
         checkbox.name = folder.title;
         checkbox.value = folder.id;
 
+        // Set the 'checked' state based on the data we loaded.
+        checkbox.checked = indexedFolders.includes(folder.id);
+
         const label = document.createElement('label');
         label.htmlFor = folder.id;
         label.appendChild(document.createTextNode(` ${folder.title}`));
-
-        if (indexedFolders.includes(folder.id)) {
-          checkbox.checked = true;
-          checkbox.disabled = true;
-          label.style.color = '#aaa'; // Visually indicate it's already indexed
-        }
 
         const br = document.createElement('br');
 
@@ -51,39 +61,52 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  startIndexingButton.addEventListener('click', () => {
-    statusDiv.textContent = 'Starting...';
-    const selectedFolders = [];
-    const checkboxes = document.querySelectorAll('#folders input[type="checkbox"]:checked');
-    checkboxes.forEach((checkbox) => {
-      selectedFolders.push(checkbox.value);
-    });
+  syncBookmarksButton.addEventListener('click', async () => {
+    // Get the state of indexed folders *before* the sync starts.
+    const storageData = await chrome.storage.local.get(INDEXED_FOLDERS_KEY);
+    const previouslyIndexedIds = storageData[INDEXED_FOLDERS_KEY] || [];
+    
+    const selectedCheckboxes = document.querySelectorAll('#folders input[type="checkbox"]:checked');
+    const selectedFolderIds = Array.from(selectedCheckboxes).map(cb => cb.value);
 
-    chrome.runtime.sendMessage({
-      type: 'startIndexing',
-      payload: selectedFolders,
-    });
+    const foldersToUnsyncIds = previouslyIndexedIds.filter(id => !selectedFolderIds.includes(id));
+
+    let proceed = true;
+    if (foldersToUnsyncIds.length > 0) {
+      const foldersToUnsyncNames = foldersToUnsyncIds.map(id => folderData[id] || `(Unknown Folder ID: ${id})`);
+      const confirmationMessage = `You are about to unsync and remove all indexed data for the following folders:\n\n- ${foldersToUnsyncNames.join('\n- ')}\n\nDo you want to proceed?`;
+      
+      proceed = confirm(confirmationMessage);
+    }
+
+    if (proceed) {
+      statusDiv.textContent = 'Starting sync...';
+      chrome.runtime.sendMessage({
+        type: 'syncBookmarks',
+        payload: selectedFolderIds,
+      });
+    } else {
+      statusDiv.textContent = 'Sync cancelled.';
+    }
   });
 
-  clearDataButton.addEventListener('click', () => {
-    if (confirm('Are you sure you want to delete all indexed data? This cannot be undone.')) {
-      statusDiv.textContent = 'Clearing data...';
-      chrome.runtime.sendMessage({ type: 'clearData' }, (response) => {
-        if (response.success) {
-          statusDiv.textContent = 'All data has been cleared.';
-          renderFolders(); // Re-render the folders to update their state
-          updateStats(); // Refresh stats
-        }
-      });
-    }
+  selectAllButton.addEventListener('click', () => {
+    const checkboxes = document.querySelectorAll('#folders input[type="checkbox"]');
+    checkboxes.forEach(checkbox => checkbox.checked = true);
+  });
+
+  deselectAllButton.addEventListener('click', () => {
+    const checkboxes = document.querySelectorAll('#folders input[type="checkbox"]');
+    checkboxes.forEach(checkbox => checkbox.checked = false);
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'statusUpdate') {
       statusDiv.textContent = message.payload;
-      if (message.payload === 'Indexing complete.') {
-        renderFolders(); // Re-render to show the new indexed state
-        updateStats(); // Refresh stats
+      if (message.payload.includes('complete')) {
+        // When sync is complete, refresh stats and the folder checkboxes to reflect the new state.
+        updateStats();
+        renderFolders();
       }
     }
   });
@@ -97,7 +120,10 @@ function getFolders(nodes) {
   let folders = [];
   for (const node of nodes) {
     if (node.children) {
-      folders.push({ id: node.id, title: node.title });
+      // This check prevents the root node (id '0') from being added, as it has no title.
+      if (node.title) {
+        folders.push({ id: node.id, title: node.title });
+      }
       folders = folders.concat(getFolders(node.children));
     }
   }
