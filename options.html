@@ -5,17 +5,19 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1 class="main-title">Semantic Bookmarks Options</h1>
-  <p class="subtitle">Select the bookmark folders you want to keep in sync.</p>
-  <div id="controls">
-    <button id="selectAll">Select All</button>
-    <button id="deselectAll">Deselect All</button>
+  <div class="options-container">
+    <h1 class="options-title">Semantic Bookmarks Options</h1>
+    <p class="subtitle">Select the bookmark folders you want to keep in sync.</p>
+    <div id="controls">
+      <button id="selectAll">Select All</button>
+      <button id="deselectAll">Deselect All</button>
+    </div>
+    <div id="folders"></div>
+    <button id="syncBookmarks">Sync</button>
+    <div id="status"></div>
+    <hr style="border-color: #5f6368; margin: 20px 0;">
+    <div id="stats"></div>
   </div>
-  <div id="folders"></div>
-  <button id="syncBookmarks">Sync</button>
-  <div id="status"></div>
-  <hr style="border-color: #5f6368; margin: 20px 0;">
-  <div id="stats"></div>
   <script src="options.js"></script>
 </body>
 </html>

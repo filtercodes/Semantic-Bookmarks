@@ -375,22 +375,15 @@ async function getBookmarks(folderIds) {
       const foldersToSearch = new Set(folderIds);
       function traverse(nodes) {
         for (const node of nodes) {
-          if (node.children) {
-            if (foldersToSearch.has(node.id)) {
-              getAllBookmarksInSubtree(node, bookmarks);
-            } else {
-              traverse(node.children);
+          if (foldersToSearch.has(node.id) && node.children) {
+            for (const child of node.children) {
+              if (child.url) {
+                bookmarks.push({ id: child.id, title: child.title, url: child.url });
+              }
             }
           }
-        }
-      }
-      function getAllBookmarksInSubtree(node, bookmarks) {
-        if (node.url) {
-          bookmarks.push({ id: node.id, title: node.title, url: node.url });
-        }
-        if (node.children) {
-          for (const child of node.children) {
-            getAllBookmarksInSubtree(child, bookmarks);
+          if (node.children) {
+            traverse(node.children);
           }
         }
       }

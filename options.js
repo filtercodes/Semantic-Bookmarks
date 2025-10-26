@@ -23,10 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const indexedFolders = storageData[INDEXED_FOLDERS_KEY] || [];
 
       // Build the folder list.
-      const folders = getFolders(bookmarkTree);
+      const folders = getFoldersWithCounts(bookmarkTree);
 
       folders.forEach((folder) => {
         folderData[folder.id] = folder.title; // Store title for later use
+
+        const folderItem = document.createElement('div');
+        folderItem.className = 'folder-item';
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -37,15 +40,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Set the 'checked' state based on the data we loaded.
         checkbox.checked = indexedFolders.includes(folder.id);
 
+        const countSpan = document.createElement('span');
+        countSpan.className = 'bookmark-count';
+        countSpan.textContent = folder.count;
+
         const label = document.createElement('label');
         label.htmlFor = folder.id;
+        label.className = 'folder-title';
         label.appendChild(document.createTextNode(` ${folder.title}`));
 
-        const br = document.createElement('br');
+        folderItem.appendChild(checkbox);
+        folderItem.appendChild(countSpan);
+        folderItem.appendChild(label);
 
-        foldersDiv.appendChild(checkbox);
-        foldersDiv.appendChild(label);
-        foldersDiv.appendChild(br);
+        foldersDiv.appendChild(folderItem);
       });
     });
   }
@@ -116,16 +124,29 @@ document.addEventListener('DOMContentLoaded', () => {
   updateStats();
 });
 
-function getFolders(nodes) {
+function getFoldersWithCounts(nodes) {
   let folders = [];
   for (const node of nodes) {
     if (node.children) {
       // This check prevents the root node (id '0') from being added, as it has no title.
       if (node.title) {
-        folders.push({ id: node.id, title: node.title });
+        const count = countBookmarksInNode(node);
+        folders.push({ id: node.id, title: node.title, count: count });
       }
-      folders = folders.concat(getFolders(node.children));
+      folders = folders.concat(getFoldersWithCounts(node.children));
     }
   }
   return folders;
+}
+
+function countBookmarksInNode(node) {
+  let count = 0;
+  if (node.children) {
+    for (const child of node.children) {
+      if (child.url) {
+        count++;
+      }
+    }
+  }
+  return count;
 }

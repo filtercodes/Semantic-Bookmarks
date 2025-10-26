@@ -30,10 +30,53 @@ input[type="checkbox"] {
   vertical-align: middle;
 }
 
+
+.options-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.options-title {
+  font-size: 2.2em;
+  color: #e8eaed;
+  margin-bottom: 15px;
+}
+
 /* Target folder labels for better readability */
 #folders label {
   font-size: 18px;
   padding: 15px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
+  border-bottom: 1px solid #3c4043;
+  padding: 5px 0;
+}
+
+.folder-item > input[type="checkbox"] {
+  padding: 15px;
+  margin-right: 15px;
+}
+
+.bookmark-count {
+  width: 80px; 
+  text-align: right;
+  padding: 0 15px;
+  color: #bdc1c6;
+  font-size: 16px;
+  border-right: 1px solid #3c4043;
+}
+
+.folder-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 350px; /* Adjust as needed */
+  padding-left: 15px;
 }
 
 button {
@@ -100,11 +143,11 @@ a:hover {
 
 #results h3 {
   margin-top: 0;
-  font-size: 1em;
+  font-size: 1.23em;
 }
 
 #results p {
-  font-size: 16px; /* Set explicit larger size for results */
+  font-size: 13px;
   margin-bottom: 0;
 }
 
@@ -116,7 +159,7 @@ a:hover {
 }
 
 h1 {
-  margin-bottom: 0; /* Adjust for new layout */
+  margin-bottom: 0;
 }
 
 #clearButton {
