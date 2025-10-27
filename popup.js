@@ -1,14 +1,33 @@
 // popup.js
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- Apply Popup Size ---
+  const POPUP_SIZE_KEY = 'popupSize';
+  chrome.storage.local.get(POPUP_SIZE_KEY, (data) => {
+    const size = data[POPUP_SIZE_KEY] || 'medium'; // Default to medium
+    document.body.classList.add(`size-${size}`);
+  });
+
   const searchInput = document.getElementById('search');
   const searchButton = document.getElementById('searchButton');
   const clearButton = document.getElementById('clearButton');
   const resultsDiv = document.getElementById('results');
+  const SEARCH_RESULT_LIMIT = 30; // Should match the value in background.js
+
+  let observer;
+  let sentinel;
 
   // Function to render results on the screen
-  function renderResults(results) {
-    resultsDiv.innerHTML = '';
+  function renderResults(results, append = false) {
+    if (!append) {
+      resultsDiv.innerHTML = '';
+    }
+
+    // Remove sentinel before adding new results
+    if (sentinel) {
+      sentinel.remove();
+    }
+
     if (results && results.length > 0) {
       clearButton.classList.remove('inactive');
       results.forEach((result) => {
@@ -36,10 +55,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resultsDiv.appendChild(resultDiv);
       });
-    } else {
+
+      // If we received a full page of results, there might be more
+      if (results.length === SEARCH_RESULT_LIMIT) {
+        addSentinel();
+      }
+
+    } else if (!append) {
       resultsDiv.innerHTML = 'No results found.';
       clearButton.classList.add('inactive');
     }
+  }
+
+  function addSentinel() {
+    sentinel = document.createElement('div');
+    sentinel.className = 'loading-indicator';
+    resultsDiv.appendChild(sentinel);
+    setupObserver();
+  }
+
+  function setupObserver() {
+    if (observer) {
+      observer.disconnect();
+    }
+    observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        loadMoreResults();
+      }
+    }, { threshold: 1.0 });
+
+    if (sentinel) {
+      observer.observe(sentinel);
+    }
+  }
+
+  async function loadMoreResults() {
+    // Stop observing to prevent multiple triggers
+    if (observer) {
+      observer.disconnect();
+    }
+
+    // Show spinner
+    if (sentinel) {
+      sentinel.innerHTML = '<div class="spinner"></div>';
+    }
+
+    const data = await chrome.storage.session.get('currentPage');
+    const nextPage = (data.currentPage || 1) + 1;
+
+    // Fake delay for better UX
+    setTimeout(() => {
+      chrome.runtime.sendMessage({ type: 'getMoreResults', payload: { page: nextPage } }, (results) => {
+        renderResults(results, true);
+        chrome.storage.session.set({ currentPage: nextPage });
+      });
+    }, 500); // 0.5-second delay
   }
 
   function performSearch() {
@@ -47,8 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (query.length > 2) {
       resultsDiv.innerHTML = '<i>Searching...</i>';
-      // Reset scroll position for the new search
-      chrome.storage.session.set({ lastScrollPosition: 0 });
+      if (observer) observer.disconnect();
+
+      // Reset state for the new search
+      chrome.storage.session.set({ lastScrollPosition: 0, currentPage: 1 });
+
       chrome.runtime.sendMessage({ type: 'search', payload: query }, (results) => {
         renderResults(results);
         // Save state to session storage
@@ -56,7 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } else {
       resultsDiv.innerHTML = '';
-      chrome.storage.session.remove(['lastSearchQuery', 'lastSearchResults', 'lastScrollPosition']);
+      if (observer) observer.disconnect();
+      chrome.storage.session.remove(['lastSearchQuery', 'lastSearchResults', 'lastScrollPosition', 'currentPage']);
       clearButton.classList.add('inactive');
     }
   }
@@ -64,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function clearSearch() {
     searchInput.value = '';
     resultsDiv.innerHTML = '';
-    chrome.storage.session.remove(['lastSearchQuery', 'lastSearchResults', 'lastScrollPosition']);
+    if (observer) observer.disconnect();
+    chrome.storage.session.remove(['lastSearchQuery', 'lastSearchResults', 'lastScrollPosition', 'currentPage']);
     clearButton.classList.add('inactive');
   }
 

@@ -122,6 +122,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial render and stats load
   renderFolders();
   updateStats();
+
+  // --- Popup Size Controls ---
+  const POPUP_SIZE_KEY = 'popupSize';
+  const sizeRadios = document.querySelectorAll('input[name="popup-size"]');
+
+  // Load saved size and update radio buttons
+  chrome.storage.local.get(POPUP_SIZE_KEY, (data) => {
+    const savedSize = data[POPUP_SIZE_KEY] || 'medium'; // Default to medium
+    document.querySelector(`input[name="popup-size"][value="${savedSize}"]`).checked = true;
+  });
+
+  // Save size when a radio button is changed
+  sizeRadios.forEach(radio => {
+    radio.addEventListener('change', (event) => {
+      chrome.storage.local.set({ [POPUP_SIZE_KEY]: event.target.value });
+    });
+  });
 });
 
 function getFoldersWithCounts(nodes) {

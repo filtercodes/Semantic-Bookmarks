@@ -10,6 +10,7 @@ const MIN_SCRAPE_LENGTH = 100; // Minimum number of characters for a scrape to b
 
 let db;
 let SCRAPING_ANTI_PATTERNS = [];
+let cachedSearchResults = [];
 
 // --- Database and Initialization ---
 
@@ -66,6 +67,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const messageHandlers = {
     syncBookmarks: (payload) => syncBookmarks(payload),
     search: async (payload) => sendResponse(await search(payload)),
+    getMoreResults: (payload) => sendResponse(getMoreResults(payload)),
     clearData: async () => sendResponse(await clearAllData()),
     getStats: async () => sendResponse(await getStats()),
   };
@@ -75,11 +77,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (handler) {
     (async () => {
       await initializationComplete;
-      await handler(message.payload);
+      // The handler for getMoreResults is synchronous and doesn't need awaiting
+      if (message.type === 'getMoreResults') {
+        handler(message.payload);
+      } else {
+        await handler(message.payload);
+      }
     })();
 
     // Return true only for messages that expect a response.
-    return ['search', 'clearData', 'getStats'].includes(message.type);
+    return ['search', 'getMoreResults', 'clearData', 'getStats'].includes(message.type);
   }
 
   // It's good practice to return false or undefined for unhandled messages.
@@ -189,6 +196,8 @@ async function syncBookmarks(selectedFolderIds) {
 
 async function search(query) {
   console.log('Searching for:', query);
+  cachedSearchResults = []; // Clear previous results
+
   const queryEmbedding = await getEmbedding(query);
   if (!queryEmbedding) {
     return [];
@@ -217,9 +226,7 @@ async function search(query) {
   const finalResults = Array.from(bestResults.values());
   finalResults.sort((a, b) => b.similarity - a.similarity);
 
-  const topResults = finalResults.slice(0, SEARCH_RESULT_LIMIT);
-
-  if (topResults.length === 0) {
+  if (finalResults.length === 0) {
     return [];
   }
 
@@ -229,20 +236,28 @@ async function search(query) {
     return acc;
   }, {});
 
-  const searchResults = [];
-  for (const result of topResults) {
+  // Store the full list of rich results in the cache
+  cachedSearchResults = finalResults.map(result => {
     const bookmark = bookmarksById[result.bookmarkId];
     if (bookmark) {
-      searchResults.push({
+      return {
         title: bookmark.title,
         url: bookmark.url,
         chunk: result.chunk,
         similarity: result.similarity,
-      });
+      };
     }
-  }
+    return null;
+  }).filter(Boolean); // Filter out any nulls if a bookmark wasn't found
 
-  return searchResults;
+  // Return only the first page
+  return cachedSearchResults.slice(0, SEARCH_RESULT_LIMIT);
+}
+
+function getMoreResults({ page }) {
+  const startIndex = (page - 1) * SEARCH_RESULT_LIMIT;
+  const endIndex = startIndex + SEARCH_RESULT_LIMIT;
+  return cachedSearchResults.slice(startIndex, endIndex);
 }
 
 

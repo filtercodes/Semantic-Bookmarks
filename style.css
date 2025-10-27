@@ -2,16 +2,36 @@ body {
   background-color: #202124;
   color: #e8eaed;
   font-family: sans-serif;
-  min-width: 300px;
+  /* Width is now controlled by classes below */
   padding: 15px;
   line-height: 1.5;
 }
+
+/* Popup Size Classes */
+body.size-small { width: 320px; }
+body.size-medium { width: 480px; }
+body.size-large { width: 640px; }
 
 h1 {
   font-size: 1.2em;
   margin-top: 0;
   color: #727478;
   /* color: #bdc1c6; */
+}
+
+.spinner {
+  border: 4px solid #5f6368;
+  border-top: 4px solid #8ab4f8;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto; /* Center the spinner */
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 input[type="text"] {
@@ -23,11 +43,13 @@ input[type="text"] {
   color: #e8eaed;
 }
 
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
   accent-color: #5f6368;
   width: 15px;
   height: 15px;
   vertical-align: middle;
+  margin-right: 5px;
 }
 
 
@@ -36,7 +58,6 @@ input[type="checkbox"] {
   margin: 0 auto;
   padding: 20px;
 }
-
 .options-title {
   font-size: 2.2em;
   color: #e8eaed;
@@ -90,6 +111,11 @@ button {
   margin-top: 10px;
   font-size: 1.1em;
   transition: background-color 0.2s ease-in-out;
+}
+
+#syncBookmarks {
+  padding: 10px 9px;
+  margin: 9px;
 }
 
 button:hover {
@@ -162,6 +188,11 @@ h1 {
   margin-bottom: 0;
 }
 
+#status {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 #clearButton {
   background: none;
   border: none;
@@ -188,4 +219,9 @@ h1 {
 #clearButton.inactive {
   color: #313236;
   pointer-events: none; /* Makes the button unclickable */
+}
+
+.loading-indicator {
+  text-align: center;
+  margin: 10px 0;
 }
