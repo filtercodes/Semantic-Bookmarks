@@ -57,17 +57,7 @@ async function loadAntiPatterns() {
 
 // --- Message Listeners ---
 
-//chrome.runtime.onStartup.addListener(async () => {
-//  await openDB();
-//  await loadAntiPatterns();
-//});
-
-//chrome.runtime.onInstalled.addListener(async () => {
-//  await openDB();
-//  await loadAntiPatterns();
-//});
-
-// Use a promise to ensure initialization is complete before handling messages
+// A promise to ensure initialization is complete before handling messages
 const initializationComplete = (async () => {
   await openDB();
   await loadAntiPatterns();
@@ -132,32 +122,50 @@ function isScrapeSuccessful(text) {
   return true;
 }
 
+function isDeadLink(scrapeResult) {
+  if (!scrapeResult || !scrapeResult.error) {
+    return false;
+  }
+  const errorMsg = scrapeResult.error;
+  // Check for client-side errors (4xx) or general network failures.
+  return errorMsg.startsWith('[FETCH_FAILED:4') || errorMsg.startsWith('[NETWORK_ERROR]');
+}
+
 async function syncBookmarks(selectedFolderIds) {
   sendStatus('Starting sync...');
 
-  // Get all bookmark IDs currently in the database
+  // Get existing bookmarks and the list of known dead links
   const existingBookmarkIds = new Set(await getAllKeysFromStore(BOOKMARKS_STORE));
-  console.log(`Found ${existingBookmarkIds.size} existing bookmarks in DB.`);
+  const { deadLinkIds = [] } = await chrome.storage.local.get('deadLinkIds');
+  const deadLinkIdsSet = new Set(deadLinkIds);
+  console.log(`Found ${existingBookmarkIds.size} existing bookmarks and ${deadLinkIdsSet.size} dead links.`);
 
   // Get all bookmarks from the user-selected folders
   const bookmarksInSelectedFolders = await getBookmarks(selectedFolderIds);
   const selectedBookmarkIds = new Set(bookmarksInSelectedFolders.map(b => b.id));
   console.log(`Found ${selectedBookmarkIds.size} bookmarks in selected folders.`);
 
-  // Determine what to add and what to remove
-  const bookmarksToAdd = bookmarksInSelectedFolders.filter(b => !existingBookmarkIds.has(b.id));
-  const bookmarkIdsToRemove = [...existingBookmarkIds].filter(id => !selectedBookmarkIds.has(id));
+  // --- Cleanup Phase ---
+  // Identify and remove any bookmarks from our records that the user has deleted.
+  const allKnownIds = new Set([...existingBookmarkIds, ...deadLinkIdsSet]);
+  const idsToRemove = [...allKnownIds].filter(id => !selectedBookmarkIds.has(id));
 
-  console.log(`New bookmarks to index: ${bookmarksToAdd.length}`);
-  console.log(`Bookmarks to remove: ${bookmarkIdsToRemove.length}`);
-
-  // Remove bookmarks that are no longer in selected folders
-  if (bookmarkIdsToRemove.length > 0) {
-    sendStatus(`Removing ${bookmarkIdsToRemove.length} old bookmarks...`);
-    await removeBookmarks(bookmarkIdsToRemove);
+  if (idsToRemove.length > 0) {
+    sendStatus(`Removing ${idsToRemove.length} old entries...`);
+    await removeBookmarks(idsToRemove); // Remove from IndexedDB
+    // Remove from dead list set and save the cleaned list
+    idsToRemove.forEach(id => deadLinkIdsSet.delete(id));
+    await chrome.storage.local.set({ deadLinkIds: Array.from(deadLinkIdsSet) });
+    console.log(`Cleaned ${idsToRemove.length} obsolete entries.`);
   }
 
-  // Index the bookmarks
+  // --- Indexing Phase ---
+  // Determine which bookmarks to index: not already in DB and not on the dead list.
+  const bookmarksToAdd = bookmarksInSelectedFolders.filter(
+    b => !existingBookmarkIds.has(b.id) && !deadLinkIdsSet.has(b.id)
+  );
+  console.log(`New bookmarks to index: ${bookmarksToAdd.length}`);
+
   if (bookmarksToAdd.length > 0) {
     await createOffscreenDocument();
     let count = 0;
@@ -166,7 +174,16 @@ async function syncBookmarks(selectedFolderIds) {
       sendStatus(`Indexing ${count} of ${bookmarksToAdd.length}: ${bookmark.title}`);
       const result = await chrome.runtime.sendMessage({ type: 'scrape', payload: bookmark.url });
 
+      if (isDeadLink(result)) {
+        console.log(`Skipping dead link for '${bookmark.title}' (${bookmark.url}). Reason:`, result.error);
+        // Add the ID to the dead list and save it to prevent re-syncing.
+        deadLinkIdsSet.add(bookmark.id);
+        await chrome.storage.local.set({ deadLinkIds: Array.from(deadLinkIdsSet) });
+        continue; // Move to the next bookmark
+      }
+
       if (result && !result.error && isScrapeSuccessful(result.text)) {
+        console.log(`Successfully scraped and indexed '${bookmark.title}' (${bookmark.url}).`);
         const textWithTitle = `${bookmark.title}\n\n${result.text}`;
         const chunks = chunkText(textWithTitle);
         for (const chunk of chunks) {
@@ -179,13 +196,11 @@ async function syncBookmarks(selectedFolderIds) {
           }
         }
       } else {
-        console.log(`Scrape failed for ${bookmark.url}. Falling back to title. Reason:`, result.error || "Failed quality check.");
-        // Chunk the title as it might be too long, but only use the first chunk.
+        console.log(`Scrape failed for '${bookmark.title}' (${bookmark.url}), but it's not a dead link. Falling back to title. Reason:`, result.error || "Failed quality check.");
         const titleChunk = chunkText(bookmark.title)[0];
         if (titleChunk) {
           const embedding = await getEmbedding(titleChunk);
           if (embedding) {
-            // Store with a placeholder to indicate the content was not scraped.
             await storeData(bookmark, "[Content could not be scraped...]", embedding);
           }
         }

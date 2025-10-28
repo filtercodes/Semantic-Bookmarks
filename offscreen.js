@@ -14,17 +14,16 @@ async function scrape(url) {
 
   try {
     const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId); // Clear the timeout if the fetch succeeds
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      return { error: `Failed to fetch ${url}: ${response.statusText}` };
+      // Prefix with a tag for easy identification
+      return { error: `[FETCH_FAILED:${response.status}] Failed to fetch ${url}: ${response.statusText}` };
     }
 
-    // --- Content-Type Check ---
-    // We are only processing HTML content.
     const contentType = response.headers.get('Content-Type');
     if (!contentType || !contentType.includes('text/html')) {
-      return { error: `Unsupported content type: ${contentType || 'N/A'}` };
+      return { error: `[UNSUPPORTED_CONTENT] Unsupported content type: ${contentType || 'N/A'}` };
     }
 
     const html = await response.text();
@@ -67,7 +66,7 @@ async function scrape(url) {
     }
 
     // --- Word Length Filter ---
-    // Define a reasonable maximum length for a single "word".
+    // Reasonable maximum length for a single "word".
     const MAX_WORD_LENGTH = 150;
     const words = rawText.split(/\s+/);
     const saneWords = words.flatMap(word => {
@@ -86,8 +85,8 @@ async function scrape(url) {
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
-      return { error: `Failed to scrape ${url}: Request timed out after ${SCRAPE_TIMEOUT_MS / 1000} seconds.` };
+      return { error: `[TIMEOUT] Failed to scrape ${url}: Request timed out after ${SCRAPE_TIMEOUT_MS / 1000} seconds.` };
     }
-    return { error: `Failed to scrape ${url}: ${error.message}` };
+    return { error: `[NETWORK_ERROR] Failed to scrape ${url}: ${error.message}` };
   }
 }
