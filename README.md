@@ -33,6 +33,15 @@ If you use the Ollama desktop application, you should set a system-wide environm
     ```
 -  Quit and restart Ollama desktop app for the setting to take effect.
 
+### To make variable persistent after reboot (macOS)
+
+1.  Open `System Settings`.
+2.  Go to `General` > `Login Items`.
+3.  Under `Open at Login`, click the `+` button.
+4.  Navigate to the directory where you have this extension's code and select the `set_ollama_origins.app` file.
+5.  This will add the script to your login items and it will be run every time you log in, setting the environment variable for Ollama.
+6.  Then start Ollama desktop app or restart if it's currently running.
+
 ## Indexing Folders
 
 Right click on the extension icon in the upper right part of the browser and select options. It will show the list of bookmarks folders in your browser. Select the ones you want indexed.

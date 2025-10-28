@@ -57,6 +57,16 @@ async function loadAntiPatterns() {
 
 // --- Message Listeners ---
 
+//chrome.runtime.onStartup.addListener(async () => {
+//  await openDB();
+//  await loadAntiPatterns();
+//});
+
+//chrome.runtime.onInstalled.addListener(async () => {
+//  await openDB();
+//  await loadAntiPatterns();
+//});
+
 // Use a promise to ensure initialization is complete before handling messages
 const initializationComplete = (async () => {
   await openDB();
