@@ -7,17 +7,7 @@
 <body>
   <div class="options-container">
     <h1 class="options-title">Semantic Bookmarks Options</h1>
-    <p class="subtitle">Select the bookmark folders you want to make available for the semantic search. Once selected, press the Sync button to start indexing. Idexed websites will show as the results on the popup search page.</p>
-    <div id="controls">
-      <button id="selectAll">Select All</button>
-      <button id="deselectAll">Deselect All</button>
-    </div>
-    <div id="folders"></div>
-    <button id="syncBookmarks">Sync</button>
-    <div id="status"></div>
-    <hr style="border-color: #5f6368; margin: 20px 0;">
-    <div id="stats"></div>
-    <hr style="border-color: #5f6368; margin: 20px 0;">
+
     <div id="popup-size-options">
       <h2 class="subtitle">Popup Window Size</h2>
       <label>
@@ -30,6 +20,22 @@
         <input type="radio" name="popup-size" value="large"> Large
       </label>
     </div>
+
+    <hr style="border-color: #5f6368; margin: 20px 0;">
+    <h2 class="subtitle">Indexing Folders</h2>
+    <div id="stats"></div>
+
+    <button id="syncBookmarks">Sync</button>
+    <div id="status"></div>
+    <hr style="border-color: #5f6368; margin: 20px 0;">
+
+    <p class="subtitle">Select the bookmark folders you want to make available for the semantic search. Once selected, press the Sync button to start indexing. Indexed websites will show as the results on the popup search page.</p>
+
+    <div id="controls">
+      <button id="selectAll">Select All</button>
+      <button id="deselectAll">Deselect All</button>
+    </div>
+    <div id="folders"></div>
   </div>
   <script src="options.js"></script>
 </body>

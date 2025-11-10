@@ -62,8 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ type: 'getStats' }, (stats) => {
       if (stats) {
         statsDiv.innerHTML = `
-          <p><strong>Indexed Bookmarks:</strong> ${stats.bookmarksCount}</p>
-          <p><strong>Total Chunks Stored:</strong> ${stats.embeddingsCount}</p>
+          <p>Indexed Bookmarks: ${stats.bookmarksCount}</p>
+          <p>Total Chunks Stored: ${stats.embeddingsCount}</p>
         `;
       }
     });

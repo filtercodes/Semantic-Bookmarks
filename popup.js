@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
       clearButton.classList.remove('inactive');
       results.forEach((result) => {
         const resultDiv = document.createElement('div');
-        resultDiv.style.border = '1px solid #ccc';
         resultDiv.style.padding = '10px';
         resultDiv.style.marginBottom = '10px';
 
@@ -44,13 +43,32 @@ document.addEventListener('DOMContentLoaded', () => {
         title.appendChild(link);
         resultDiv.appendChild(title);
 
+        const urlLink = document.createElement('a');
+        urlLink.href = result.url;
+        urlLink.target = '_blank';
+        urlLink.textContent = result.url;
+        urlLink.style.fontSize = 'small';
+        urlLink.style.color = '#808080';
+        urlLink.style.whiteSpace = 'nowrap';
+        urlLink.style.overflow = 'hidden';
+        urlLink.style.textOverflow = 'ellipsis';
+        urlLink.style.display = 'block'; // Block display for overflow to work
+        urlLink.style.textDecoration = 'none'; // No underline
+        resultDiv.appendChild(urlLink);
+
         const chunk = document.createElement('p');
         chunk.textContent = result.chunk;
+        chunk.style.display = '-webkit-box';
+        chunk.style.webkitLineClamp = '6';
+        chunk.style.webkitBoxOrient = 'vertical';
+        chunk.style.overflow = 'hidden';
         resultDiv.appendChild(chunk);
 
         const similarity = document.createElement('p');
         similarity.textContent = `Similarity: ${result.similarity.toFixed(4)}`;
         similarity.style.fontStyle = 'italic';
+        similarity.style.fontSize = 'small';
+        similarity.style.color = '#808080';
         resultDiv.appendChild(similarity);
 
         resultsDiv.appendChild(resultDiv);
