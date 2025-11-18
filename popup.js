@@ -64,12 +64,16 @@ document.addEventListener('DOMContentLoaded', () => {
         chunk.style.overflow = 'hidden';
         resultDiv.appendChild(chunk);
 
-        const similarity = document.createElement('p');
-        similarity.textContent = `Similarity: ${result.similarity.toFixed(4)}`;
-        similarity.style.fontStyle = 'italic';
-        similarity.style.fontSize = 'small';
-        similarity.style.color = '#808080';
-        resultDiv.appendChild(similarity);
+        const distance = document.createElement('p');
+        if (typeof result.distance === 'number' && isFinite(result.distance)) {
+          distance.textContent = `Distance: ${result.distance.toFixed(4)}`;
+        } else {
+          distance.textContent = `Distance: ${result.distance}`;
+        }
+        distance.style.fontStyle = 'italic';
+        distance.style.fontSize = 'small';
+        distance.style.color = '#808080';
+        resultDiv.appendChild(distance);
 
         resultsDiv.appendChild(resultDiv);
       });

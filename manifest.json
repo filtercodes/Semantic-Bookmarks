@@ -19,7 +19,8 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "options_page": "options.html",
   "action": {
@@ -27,8 +28,11 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["scrape_clean.txt"],
+      "resources": ["scrape_clean.txt", "voy_search_bg.wasm", "voy_search_bg.js"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  }
 }
