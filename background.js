@@ -194,7 +194,7 @@ const initializationComplete = (async () => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const messageHandlers = {
     syncBookmarks: (payload) => syncBookmarks(payload),
-    search: async (payload) => sendResponse(await search(payload)),
+    search: (payload) => search(payload),
     getMoreResults: (payload) => sendResponse(getMoreResults(payload)),
     clearData: async () => sendResponse(await clearAllData()),
     getStats: async () => sendResponse(await getStats()),
@@ -214,7 +214,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
 
     // Return true only for messages that expect a response.
-    return ['search', 'getMoreResults', 'clearData', 'getStats'].includes(message.type);
+    return ['getMoreResults', 'clearData', 'getStats'].includes(message.type);
   }
 
   // It's good practice to return false or undefined for unhandled messages.
@@ -423,16 +423,18 @@ async function syncBookmarks(selectedFolderIds) {
 
 async function search(query) {
   console.log('Searching for:', query);
-  cachedSearchResults = [];
+  cachedSearchResults = []; // Clear for new search
 
   if (!voyIndex) {
     console.error("Voy index is not ready.");
-    return [];
+    chrome.runtime.sendMessage({ type: 'searchComplete' });
+    return;
   }
 
   const queryEmbedding = await getEmbedding(query);
   if (!queryEmbedding) {
-    return [];
+    chrome.runtime.sendMessage({ type: 'searchComplete' });
+    return;
   }
 
   const normalizedQueryEmbedding = normalize(queryEmbedding);
@@ -441,27 +443,34 @@ async function search(query) {
   const searchResult = voyIndex.search(queryVector, 500);
   const neighbors = searchResult.neighbors;
 
-  const neighborBookmarkIds = neighbors.map(n => n.id);
-  const relevantEmbeddings = await getEmbeddingsByBookmarkIds(neighborBookmarkIds);
-  const embeddingsMap = relevantEmbeddings.reduce((acc, data) => {
-    // Store the first chunk found for each bookmarkId
-    if (!acc[data.bookmarkId]) {
-      acc[data.bookmarkId] = data.chunk;
+  if (neighbors.length === 0) {
+    chrome.runtime.sendMessage({ type: 'searchComplete' });
+    return;
+  }
+
+  // Process neighbors one by one
+  for (let i = 0; i < neighbors.length; i++) {
+    const neighbor = neighbors[i];
+    const embeddingData = await getFirstEmbeddingByBookmarkId(neighbor.id);
+    
+    const result = {
+      bookmarkId: neighbor.id,
+      title: neighbor.title,
+      url: neighbor.url,
+      chunk: embeddingData ? embeddingData.chunk : 'Context not available.',
+      distance: neighbor.distance,
+    };
+    
+    cachedSearchResults.push(result); // Add to cache for pagination
+
+    // Stream results to popup if within the initial limit
+    if (i < SEARCH_RESULT_LIMIT) {
+      chrome.runtime.sendMessage({ type: 'searchResult', payload: result });
     }
-    return acc;
-  }, {});
+  }
 
-  const finalResults = neighbors.map(neighbor => ({
-    bookmarkId: neighbor.id,
-    title: neighbor.title,
-    url: neighbor.url,
-    chunk: embeddingsMap[neighbor.id] || 'Context not available.',
-    distance: neighbor.distance,
-  }));
-
-  cachedSearchResults = finalResults;
-
-  return cachedSearchResults.slice(0, SEARCH_RESULT_LIMIT);
+  // Signal that the search is complete and all results are cached
+  chrome.runtime.sendMessage({ type: 'searchComplete' });
 }
 
 function getMoreResults({ page }) {
@@ -472,6 +481,29 @@ function getMoreResults({ page }) {
 
 
 // --- Helper Functions ---
+
+async function getFirstEmbeddingByBookmarkId(bookmarkId) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EMBEDDINGS_STORE, 'readonly');
+    const store = tx.objectStore(EMBEDDINGS_STORE);
+    const index = store.index('bookmarkId_index');
+    
+    const request = index.openCursor(IDBKeyRange.only(bookmarkId));
+    
+    request.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        resolve(cursor.value); // Resolve with the first found embedding
+      } else {
+        resolve(null); // No embedding found for this bookmarkId
+      }
+    };
+
+    tx.onerror = (event) => {
+      reject(event.target.error);
+    };
+  });
+}
 
 async function getEmbedding(text) {
   try {

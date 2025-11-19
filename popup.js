@@ -16,84 +16,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let observer;
   let sentinel;
+  let isFirstResult = true;
+  let currentSearchResults = [];
 
   // Function to render results on the screen
-  function renderResults(results, append = false) {
-    if (!append) {
+  function renderResults(result, append = false) {
+    // If it's the first result, clear any 'Searching...' message
+    if (!append && resultsDiv.innerHTML.includes('<i>Searching...</i>')) {
       resultsDiv.innerHTML = '';
     }
 
     // Remove sentinel before adding new results
     if (sentinel) {
       sentinel.remove();
+      sentinel = null; // Clear sentinel reference
     }
 
-    if (results && results.length > 0) {
+    if (result) {
       clearButton.classList.remove('inactive');
-      results.forEach((result) => {
-        const resultDiv = document.createElement('div');
-        resultDiv.style.padding = '10px';
-        resultDiv.style.marginBottom = '10px';
+      const resultDiv = document.createElement('div');
+      resultDiv.style.padding = '10px';
+      resultDiv.style.marginBottom = '10px';
 
-        const title = document.createElement('h3');
-        const link = document.createElement('a');
-        link.href = result.url;
-        link.textContent = result.title;
-        link.target = '_blank';
-        title.appendChild(link);
-        resultDiv.appendChild(title);
+      const title = document.createElement('h3');
+      const link = document.createElement('a');
+      link.href = result.url;
+      link.textContent = result.title;
+      link.target = '_blank';
+      title.appendChild(link);
+      resultDiv.appendChild(title);
 
-        const urlLink = document.createElement('a');
-        urlLink.href = result.url;
-        urlLink.target = '_blank';
-        urlLink.textContent = result.url;
-        urlLink.style.fontSize = 'small';
-        urlLink.style.color = '#808080';
-        urlLink.style.whiteSpace = 'nowrap';
-        urlLink.style.overflow = 'hidden';
-        urlLink.style.textOverflow = 'ellipsis';
-        urlLink.style.display = 'block'; // Block display for overflow to work
-        urlLink.style.textDecoration = 'none'; // No underline
-        resultDiv.appendChild(urlLink);
+      const urlLink = document.createElement('a');
+      urlLink.href = result.url;
+      urlLink.target = '_blank';
+      urlLink.textContent = result.url;
+      urlLink.style.fontSize = 'small';
+      urlLink.style.color = '#808080';
+      urlLink.style.whiteSpace = 'nowrap';
+      urlLink.style.overflow = 'hidden';
+      urlLink.style.textOverflow = 'ellipsis';
+      urlLink.style.display = 'block'; // Block display for overflow to work
+      urlLink.style.textDecoration = 'none'; // No underline
+      resultDiv.appendChild(urlLink);
 
-        const chunk = document.createElement('p');
-        chunk.textContent = result.chunk;
-        chunk.style.display = '-webkit-box';
-        chunk.style.webkitLineClamp = '6';
-        chunk.style.webkitBoxOrient = 'vertical';
-        chunk.style.overflow = 'hidden';
-        resultDiv.appendChild(chunk);
+      const chunk = document.createElement('p');
+      chunk.textContent = result.chunk;
+      chunk.style.display = '-webkit-box';
+      chunk.style.webkitLineClamp = '6';
+      chunk.style.webkitBoxOrient = 'vertical';
+      chunk.style.overflow = 'hidden';
+      resultDiv.appendChild(chunk);
 
-        const distance = document.createElement('p');
-        if (typeof result.distance === 'number' && isFinite(result.distance)) {
-          distance.textContent = `Distance: ${result.distance.toFixed(4)}`;
-        } else {
-          distance.textContent = `Distance: ${result.distance}`;
-        }
-        distance.style.fontStyle = 'italic';
-        distance.style.fontSize = 'small';
-        distance.style.color = '#808080';
-        resultDiv.appendChild(distance);
-
-        resultsDiv.appendChild(resultDiv);
-      });
-
-      // If we received a full page of results, there might be more
-      if (results.length === SEARCH_RESULT_LIMIT) {
-        addSentinel();
+      const distance = document.createElement('p');
+      if (typeof result.distance === 'number' && isFinite(result.distance)) {
+        distance.textContent = `Distance: ${result.distance.toFixed(4)}`;
+      } else {
+        distance.textContent = `Distance: ${result.distance}`;
       }
+      distance.style.fontStyle = 'italic';
+      distance.style.fontSize = 'small';
+      distance.style.color = '#808080';
+      resultDiv.appendChild(distance);
 
-    } else if (!append) {
+      resultsDiv.appendChild(resultDiv);
+
+    } else if (!append && resultsDiv.innerHTML === '') { // Only show 'No results' if nothing has been appended yet
       resultsDiv.innerHTML = 'No results found.';
       clearButton.classList.add('inactive');
     }
   }
 
-  function addSentinel() {
-    sentinel = document.createElement('div');
-    sentinel.className = 'loading-indicator';
-    resultsDiv.appendChild(sentinel);
-    setupObserver();
+  // This function will now be called only when searchComplete is received
+  function addSentinelAndSetupObserver() {
+    if (resultsDiv.children.length > 0) { // Only add sentinel if there are results to paginate
+      sentinel = document.createElement('div');
+      sentinel.className = 'loading-indicator';
+      resultsDiv.appendChild(sentinel);
+      setupObserver();
+    }
   }
 
   function setupObserver() {
@@ -128,8 +128,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fake delay for better UX
     setTimeout(() => {
       chrome.runtime.sendMessage({ type: 'getMoreResults', payload: { page: nextPage } }, (results) => {
-        renderResults(results, true);
-        chrome.storage.session.set({ currentPage: nextPage });
+        // If no more results, remove sentinel and don't re-add
+        if (results && results.length > 0) {
+          currentSearchResults.push(...results); // Add new results to our list
+          chrome.storage.session.set({ 
+            lastSearchResults: currentSearchResults, // Save the updated list
+            currentPage: nextPage 
+          });
+          results.forEach(result => renderResults(result, true)); // Append each result
+          // If we received a full page of results, there might be more
+          if (results.length === SEARCH_RESULT_LIMIT) {
+            addSentinelAndSetupObserver(); // Re-add sentinel for next page
+          }
+        } else if (sentinel) {
+          sentinel.remove();
+          sentinel = null;
+        }
       });
     }, 500); // 0.5-second delay
   }
@@ -142,13 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (observer) observer.disconnect();
 
       // Reset state for the new search
-      chrome.storage.session.set({ lastScrollPosition: 0, currentPage: 1 });
+      chrome.storage.session.set({ lastSearchQuery: query, lastScrollPosition: 0, currentPage: 1 });
+      isFirstResult = true;
+      currentSearchResults = [];
 
-      chrome.runtime.sendMessage({ type: 'search', payload: query }, (results) => {
-        renderResults(results);
-        // Save state to session storage
-        chrome.storage.session.set({ lastSearchQuery: query, lastSearchResults: results });
-      });
+      chrome.runtime.sendMessage({ type: 'search', payload: query });
     } else {
       resultsDiv.innerHTML = '';
       if (observer) observer.disconnect();
@@ -183,15 +195,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 200); // Debounce to avoid saving on every single scroll event
   });
 
+  // New message listener for streamed results
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'searchResult') {
+      if (isFirstResult) {
+        resultsDiv.innerHTML = ''; // Clear "Searching..."
+        isFirstResult = false;
+      }
+      currentSearchResults.push(message.payload); // Collect streamed results
+      renderResults(message.payload, true); // Append individual result
+    } else if (message.type === 'searchComplete') {
+      // All initial results streamed, now set up pagination
+      addSentinelAndSetupObserver();
+      // Save the complete set of results to session storage
+      chrome.storage.session.set({ lastSearchResults: currentSearchResults });
+    }
+  });
+
   // Restore state when popup opens
   chrome.storage.session.get(['lastSearchQuery', 'lastSearchResults', 'lastScrollPosition'], (data) => {
     if (data.lastSearchQuery && data.lastSearchResults) {
       searchInput.value = data.lastSearchQuery;
-      renderResults(data.lastSearchResults);
+      currentSearchResults = data.lastSearchResults; // Restore currentSearchResults
+      // When restoring, we don't stream, we just render the cached page
+      data.lastSearchResults.forEach(result => renderResults(result, true));
       // Restore scroll position after results are rendered
       if (data.lastScrollPosition) {
         resultsDiv.scrollTop = data.lastScrollPosition;
       }
+      // After restoring, set up the observer for further pagination
+      addSentinelAndSetupObserver();
     } else {
       // If there's no state, ensure the button is inactive
       clearButton.classList.add('inactive');
