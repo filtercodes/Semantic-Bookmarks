@@ -1,8 +1,12 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
   background-color: #202124;
   color: #e8eaed;
   font-family: sans-serif;
-  /* Width is now controlled by classes below */
+  /* Popup width is controlled by classes below */
   padding: 15px;
   line-height: 1.5;
 }
@@ -34,9 +38,9 @@ h1 {
 }
 
 input[type="text"] {
-  width: 85%;
-  padding: 8px;
-  border-radius: 15px;
+  width: 100%; /* Fill the available space in the flex container */
+  padding: 10px 12px 10px 35px; /* Slightly more vertical padding */
+  border-radius: 6px; /* Sharper corners */
   border: 1px solid #5f6368;
   background-color: #303134;
   color: #e8eaed;
@@ -136,6 +140,14 @@ button:hover {
   margin-bottom: 20px;
 }
 
+.search-container {
+  display: flex;
+  align-items: center; /* Vertically centers input and button */
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 15px;
+}
+
 #controls {
   margin-bottom: 15px;
 }
@@ -165,7 +177,8 @@ a:hover {
 #results {
   max-height: 400px;
   overflow-y: auto;
-  margin-top: 10px;
+  width: 100%; /* Force full width */
+  margin-top: 0;
 }
 
 /* Custom Scrollbar for Webkit browsers */
@@ -184,8 +197,17 @@ a:hover {
 }
 
 #searchButton {
-  margin-top: 15px;
-  margin-left: 5px;
+  margin-top: 0;        /* Remove margin so it aligns with input */
+  margin-left: 10px;    /* Add space between input and button */
+  white-space: nowrap;  /* Keep "Search" text on one line */
+  height: 100%;         /* Ensure it matches input height if we stretch */
+  padding: 10px 15px;   /* Match input padding */
+  border: none;
+  font-weight: 600;
+}
+
+#searchButton:hover {
+  background-color: #76a7fa; /* Slightly lighter blue on hover */
 }
 
 #results h3 {

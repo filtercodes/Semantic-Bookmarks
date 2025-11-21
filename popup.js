@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // This function will now be called only when searchComplete is received
+  // This function will be called only when searchComplete is received
   function addSentinelAndSetupObserver() {
     if (resultsDiv.children.length > 0) { // Only add sentinel if there are results to paginate
       sentinel = document.createElement('div');
@@ -229,5 +229,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // If there's no state, ensure the button is inactive
       clearButton.classList.add('inactive');
     }
+
+    // Focus the input automatically ---
+    searchInput.focus();
+
+    // If text was restored, move cursor to the end (Standard UX)
+    if (searchInput.value.length > 0) {
+        const len = searchInput.value.length;
+        searchInput.setSelectionRange(len, len);
+    }
+    // ---------------------------------------------------
   });
 });
