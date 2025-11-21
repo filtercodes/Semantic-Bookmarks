@@ -3,6 +3,7 @@
 }
 
 body {
+  margin: 0; /* Reset default browser margin */
   background-color: #202124;
   color: #e8eaed;
   font-family: sans-serif;
@@ -238,7 +239,7 @@ h1 {
   color: #bdc1c6;
   font-size: 0.9em;
   cursor: pointer;
-  padding: 0 5px;
+  padding: 0;
   line-height: 1;
   margin-top: 0; /* Override default button margin */
 }
