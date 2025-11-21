@@ -206,10 +206,6 @@ a:hover {
   font-weight: 600;
 }
 
-#searchButton:hover {
-  background-color: #76a7fa; /* Slightly lighter blue on hover */
-}
-
 #results h3 {
   margin-top: 0;
   font-size: 1.23em;
